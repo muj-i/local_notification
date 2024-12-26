@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:local_notification/widgets/notification_permission_alert.dart';
@@ -14,7 +15,19 @@ abstract class LocalNotificationServices {
     log("Notification receive");
   }
 
-  static Future<void> init(String appName) async {
+  static Future<void> init(
+    String channelId,
+    String channelName,
+    String channelDescription,
+    Importance? importance,
+  ) async {
+    AndroidNotificationChannel channel = AndroidNotificationChannel(
+      channelId,
+      channelName,
+      description: channelDescription,
+      importance: importance ?? Importance.high,
+    );
+
     const AndroidInitializationSettings androidInitializationSettings =
         AndroidInitializationSettings("@mipmap/ic_launcher");
     const DarwinInitializationSettings iOSInitializationSettings =
@@ -31,36 +44,66 @@ abstract class LocalNotificationServices {
       onDidReceiveBackgroundNotificationResponse: onDidReceiveNotification,
     );
 
+    if (Platform.isAndroid) {
+      final androidNotificationPlugin =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidNotificationPlugin?.createNotificationChannel(channel);
+    } else if (Platform.isIOS) {
+      final iOSNotificationPlugin =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+      await iOSNotificationPlugin?.checkPermissions();
+
+      if (await iOSNotificationPlugin?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          ) ==
+          false) {
+        await iOSNotificationPlugin?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    }
+  }
+
+  static Future<void> permission(appName) async {
     Permission notification = Permission.notification;
 
     if (await notification.isPermanentlyDenied) {
       NotificationPermissionAlert.show(
-        appName: appName,
-        onAllowPress: () async {
-        await notification.request();
-        await flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.requestNotificationsPermission();
-      }, onDenyPress: () {
-        openAppSettings();
-      });
+          appName: appName,
+          onAllowPress: () async {
+            await notification.request();
+            await flutterLocalNotificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                    AndroidFlutterLocalNotificationsPlugin>()
+                ?.requestNotificationsPermission();
+          },
+          onDenyPress: () {
+            openAppSettings();
+          });
     } else if (await notification.isDenied) {
       NotificationPermissionAlert.show(
-        appName: appName,
-        onAllowPress: () async {
-        await notification.request();
-        await flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.requestNotificationsPermission();
-      });
+          appName: appName,
+          onAllowPress: () async {
+            await notification.request();
+            await flutterLocalNotificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                    AndroidFlutterLocalNotificationsPlugin>()
+                ?.requestNotificationsPermission();
+          });
     } else {
       log("Notification permission is granted");
     }
   }
 
-  static Future<void> showLocalNotification(int id, String title, String body) async {
+  static Future<void> showLocalNotification(
+      int id, String title, String body) async {
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
         android: AndroidNotificationDetails(
           'instant_notification_channel_id',

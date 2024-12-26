@@ -59,7 +59,9 @@ class _MyAppState extends State<MyApp> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            LocalNotification.init('').then((value) {
+            LocalNotification.init(
+                    channelId: '', channelName: '', channelDescription: '')
+                .then((value) {
               LocalNotification.showLocalNotification(1, 'Title', 'Body');
             });
           },
